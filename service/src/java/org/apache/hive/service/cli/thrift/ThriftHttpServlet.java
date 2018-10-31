@@ -157,6 +157,14 @@ public class ThriftHttpServlet extends TServlet {
           if ((delegationToken != null) && (!delegationToken.isEmpty())) {
             clientUserName = doTokenAuth(request, response);
           } else {
+            String authHeader = request.getHeader(HttpAuthUtils.AUTHORIZATION);
+            // Each http request must have an Authorization header
+            if (authHeader == null || authHeader.isEmpty()) {
+              response.addHeader(HttpAuthUtils.WWW_AUTHENTICATE, HttpAuthUtils.NEGOTIATE);
+              response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+              return;
+            }
+
             clientUserName = doKerberosAuth(request);
           }
         }
@@ -209,11 +217,10 @@ public class ThriftHttpServlet extends TServlet {
     catch (HttpAuthenticationException e) {
       LOG.error("Error: ", e);
       // Send a 401 to the client
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       if(isKerberosAuthMode(authType)) {
         response.addHeader(HttpAuthUtils.WWW_AUTHENTICATE, HttpAuthUtils.NEGOTIATE);
       }
-      response.getWriter().println("Authentication Error: " + e.getMessage());
+      response.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
     }
     finally {
       // Clear the thread locals
