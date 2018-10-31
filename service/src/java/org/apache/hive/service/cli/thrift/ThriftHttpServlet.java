@@ -19,13 +19,14 @@
 package org.apache.hive.service.cli.thrift;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
@@ -34,8 +35,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.NewCookie;
 
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.codec.binary.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.shims.HadoopShims.KerberosNameShim;
@@ -154,7 +153,7 @@ public class ThriftHttpServlet extends TServlet {
           String delegationToken = request.getHeader(HIVE_DELEGATION_TOKEN_HEADER);
           // Each http request must have an Authorization header
           if ((delegationToken != null) && (!delegationToken.isEmpty())) {
-            clientUserName = doTokenAuth(request, response);
+            clientUserName = doTokenAuth(request);
           } else {
             String authHeader = request.getHeader(HttpAuthUtils.AUTHORIZATION);
             // Each http request must have an Authorization header
@@ -346,19 +345,22 @@ public class ThriftHttpServlet extends TServlet {
    * Do the LDAP/PAM authentication
    * @param request
    * @param authType
+   * @return Username
    * @throws HttpAuthenticationException
    */
   private String doPasswdAuth(HttpServletRequest request, String authType)
       throws HttpAuthenticationException {
-    String userName = getUsername(request, authType);
+    String[] creds = getAuthHeaderTokens(request, authType);
+
+    String userName = getUsername(creds);
     // No-op when authType is NOSASL
     if (!authType.equalsIgnoreCase(HiveAuthConstants.AuthTypes.NOSASL.toString())) {
       try {
         AuthMethods authMethod = AuthMethods.getValidAuthMethod(authType);
         PasswdAuthenticationProvider provider =
             AuthenticationProviderFactory.getAuthenticationProvider(authMethod);
-        provider.Authenticate(userName, getPassword(request, authType));
-
+        String password = getPassword(creds);
+        provider.Authenticate(userName, password);
       } catch (Exception e) {
         throw new HttpAuthenticationException(e);
       }
@@ -366,7 +368,7 @@ public class ThriftHttpServlet extends TServlet {
     return userName;
   }
 
-  private String doTokenAuth(HttpServletRequest request, HttpServletResponse response)
+  private String doTokenAuth(HttpServletRequest request)
       throws HttpAuthenticationException {
     String tokenStr = request.getHeader(HIVE_DELEGATION_TOKEN_HEADER);
     try {
@@ -445,7 +447,7 @@ public class ThriftHttpServlet extends TServlet {
         gssContext = manager.createContext(serverCreds);
         // Get service ticket from the authorization header
         String serviceTicketBase64 = getAuthHeader(request, authType);
-        byte[] inToken = Base64.decodeBase64(serviceTicketBase64.getBytes());
+        byte[] inToken = Base64.getDecoder().decode(serviceTicketBase64);
         gssContext.acceptSecContext(inToken, 0, inToken.length);
         // Authenticate or deny based on its context completion
         if (!gssContext.isEstablished()) {
@@ -500,24 +502,20 @@ public class ThriftHttpServlet extends TServlet {
     }
   }
 
-  private String getUsername(HttpServletRequest request, String authType)
-      throws HttpAuthenticationException {
-    String[] creds = getAuthHeaderTokens(request, authType);
+  private String getUsername(String[] creds) throws HttpAuthenticationException {
     // Username must be present
-    if (creds[0] == null || creds[0].isEmpty()) {
+    if (creds.length < 1 || creds[0] == null || creds[0].isEmpty()) {
       throw new HttpAuthenticationException(
           "Authorization header received from the client does not contain username.");
     }
     return creds[0];
   }
 
-  private String getPassword(HttpServletRequest request, String authType)
-      throws HttpAuthenticationException {
-    String[] creds = getAuthHeaderTokens(request, authType);
+  private String getPassword(String[] creds) throws HttpAuthenticationException {
     // Password must be present
-    if (creds[1] == null || creds[1].isEmpty()) {
-      throw new HttpAuthenticationException("Authorization header received " +
-          "from the client does not contain username.");
+    if (creds.length != 2 || creds[1] == null || creds[1].isEmpty()) {
+      throw new HttpAuthenticationException(
+          "Authorization header received from the client does not contain password.");
     }
     return creds[1];
   }
@@ -525,8 +523,7 @@ public class ThriftHttpServlet extends TServlet {
   private String[] getAuthHeaderTokens(HttpServletRequest request,
       String authType) throws HttpAuthenticationException {
     String authHeaderBase64 = getAuthHeader(request, authType);
-    String authHeaderString = StringUtils.newStringUtf8(
-        Base64.decodeBase64(authHeaderBase64.getBytes()));
+    String authHeaderString = new String(Base64.getDecoder().decode(authHeaderBase64), StandardCharsets.UTF_8);
     return authHeaderString.split(":");
   }
 
