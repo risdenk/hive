@@ -23,9 +23,16 @@ import net.sf.jpam.Pam;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 
+/**
+ * Pam Authentication Provider.
+ */
 public class PamAuthenticationProviderImpl implements PasswdAuthenticationProvider {
 
   private final String pamServiceNames;
+
+  PamAuthenticationProviderImpl() {
+    this(new HiveConf());
+  }
 
   PamAuthenticationProviderImpl(HiveConf conf) {
     pamServiceNames = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PAM_SERVICES);

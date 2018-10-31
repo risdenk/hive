@@ -19,13 +19,16 @@ package org.apache.hive.service.auth;
 
 import javax.security.sasl.AuthenticationException;
 
-import org.apache.hadoop.hive.conf.HiveConf;
+
 
 /**
  * This class helps select a {@link PasswdAuthenticationProvider} for a given {@code AuthMethod}.
  */
 public final class AuthenticationProviderFactory {
 
+  /**
+   * Types of authentication.
+   */
   public enum AuthMethods {
     LDAP("LDAP"),
     PAM("PAM"),
@@ -58,16 +61,12 @@ public final class AuthenticationProviderFactory {
 
   public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod)
     throws AuthenticationException {
-    return getAuthenticationProvider(authMethod, new HiveConf());
-  }
-  public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod, HiveConf conf)
-    throws AuthenticationException {
     if (authMethod == AuthMethods.LDAP) {
-      return new LdapAuthenticationProviderImpl(conf);
+      return new LdapAuthenticationProviderImpl();
     } else if (authMethod == AuthMethods.PAM) {
-      return new PamAuthenticationProviderImpl(conf);
+      return new PamAuthenticationProviderImpl();
     } else if (authMethod == AuthMethods.CUSTOM) {
-      return new CustomAuthenticationProviderImpl(conf);
+      return new CustomAuthenticationProviderImpl();
     } else if (authMethod == AuthMethods.NONE) {
       return new AnonymousAuthenticationProviderImpl();
     } else {

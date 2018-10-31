@@ -19,8 +19,6 @@
 package org.apache.hive.service.cli.thrift;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -44,7 +42,6 @@ import org.apache.hadoop.hive.shims.HadoopShims.KerberosNameShim;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticator;
 import org.apache.hive.service.CookieSigner;
 import org.apache.hive.service.auth.AuthenticationProviderFactory;
 import org.apache.hive.service.auth.AuthenticationProviderFactory.AuthMethods;
@@ -69,21 +66,21 @@ import org.slf4j.LoggerFactory;
 
 /**
  *
- * ThriftHttpServlet
+ * ThriftHttpServlet.
  *
  */
 public class ThriftHttpServlet extends TServlet {
 
-  private static final long serialVersionUID = 1L;
   public static final Logger LOG = LoggerFactory.getLogger(ThriftHttpServlet.class.getName());
+
+  private static final long serialVersionUID = 1L;
+  private static final HiveConf hiveConf = new HiveConf();
   private final String authType;
   private final UserGroupInformation serviceUGI;
   private final UserGroupInformation httpUGI;
-  private HiveConf hiveConf = new HiveConf();
 
   // Class members for cookie based authentication.
   private CookieSigner signer;
-  public static final String AUTH_COOKIE = "hive.server2.auth";
   private static final SecureRandom RAN = new SecureRandom();
   private boolean isCookieAuthEnabled;
   private String cookieDomain;
@@ -92,6 +89,8 @@ public class ThriftHttpServlet extends TServlet {
   private boolean isCookieSecure;
   private boolean isHttpOnlyCookie;
   private final HiveAuthFactory hiveAuthFactory;
+  
+  private static final String AUTH_COOKIE = "hive.server2.auth";
   private static final String HIVE_DELEGATION_TOKEN_HEADER =  "X-Hive-Delegation-Token";
   private static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
@@ -366,7 +365,7 @@ public class ThriftHttpServlet extends TServlet {
       try {
         AuthMethods authMethod = AuthMethods.getValidAuthMethod(authType);
         PasswdAuthenticationProvider provider =
-            AuthenticationProviderFactory.getAuthenticationProvider(authMethod, hiveConf);
+            AuthenticationProviderFactory.getAuthenticationProvider(authMethod);
         provider.Authenticate(userName, getPassword(request, authType));
 
       } catch (Exception e) {

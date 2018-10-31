@@ -40,6 +40,9 @@ import org.apache.hive.service.auth.ldap.UserSearchFilterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Ldap Authentication Provider.
+ */
 public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(LdapAuthenticationProviderImpl.class);
@@ -53,6 +56,10 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
   private final HiveConf conf;
   private final Filter filter;
   private final DirSearchFactory searchFactory;
+
+  public LdapAuthenticationProviderImpl() {
+    this(new HiveConf(), new LdapSearchFactory());
+  }
 
   public LdapAuthenticationProviderImpl(HiveConf conf) {
     this(conf, new LdapSearchFactory());
