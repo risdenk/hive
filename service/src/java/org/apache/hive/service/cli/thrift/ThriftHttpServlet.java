@@ -108,7 +108,7 @@ public class ThriftHttpServlet extends TServlet {
     if (isCookieAuthEnabled) {
       // Generate the signer with secret.
       String secret = Long.toString(RAN.nextLong());
-      LOG.debug("Using the random number as the secret for cookie generation " + secret);
+      LOG.debug("Using the random number as the secret for cookie generation {}", secret);
       this.signer = new CookieSigner(secret.getBytes());
       this.cookieMaxAge = (int) hiveConf.getTimeVar(
         ConfVars.HIVE_SERVER2_THRIFT_HTTP_COOKIE_MAX_AGE, TimeUnit.SECONDS);
@@ -172,19 +172,19 @@ public class ThriftHttpServlet extends TServlet {
           clientUserName = doPasswdAuth(request, authType);
         }
       }
-      LOG.debug("Client username: " + clientUserName);
+      LOG.debug("Client username: {}", clientUserName);
 
       // Set the thread local username to be used for doAs if true
       SessionManager.setUserName(clientUserName);
 
       // find proxy user if any from query param
-      String doAsQueryParam = getDoAsQueryParam(request.getQueryString());
+      String doAsQueryParam = getDoAsQueryParam(request.getParameterMap());
       if (doAsQueryParam != null) {
         SessionManager.setProxyUserName(doAsQueryParam);
       }
 
       clientIpAddress = request.getRemoteAddr();
-      LOG.debug("Client IP Address: " + clientIpAddress);
+      LOG.debug("Client IP Address: {}", clientIpAddress);
       // Set the thread local ip address
       SessionManager.setIpAddress(clientIpAddress);
 
@@ -209,7 +209,7 @@ public class ThriftHttpServlet extends TServlet {
         } else {
           response.addCookie(hs2Cookie);
         }
-        LOG.info("Cookie added for clientUserName " + clientUserName);
+        LOG.info("Cookie added for clientUserName {}", clientUserName);
       }
       super.doPost(request, response);
     }
@@ -263,13 +263,11 @@ public class ThriftHttpServlet extends TServlet {
         String userName = HttpAuthUtils.getUserNameFromCookieToken(currValue);
 
         if (userName == null) {
-          LOG.warn("Invalid cookie token " + currValue);
+          LOG.warn("Invalid cookie token {}", currValue);
           continue;
         }
         //We have found a valid cookie in the client request.
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Validated the cookie for user " + userName);
-        }
+        LOG.debug("Validated the cookie for user {}", userName);
         return userName;
       }
     }
@@ -284,12 +282,11 @@ public class ThriftHttpServlet extends TServlet {
    * Each cookie is of the format [key]=[value]
    */
   private String toCookieStr(Cookie[] cookies) {
-	String cookieStr = "";
-
-	for (Cookie c : cookies) {
-     cookieStr += c.getName() + "=" + c.getValue() + " ;\n";
+	  StringBuilder cookieStr = new StringBuilder();
+	  for (Cookie c : cookies) {
+	    cookieStr.append(c.getName()).append("=").append(c.getValue()).append(" ;\n");
     }
-    return cookieStr;
+    return cookieStr.toString();
   }
 
   /**
@@ -298,20 +295,17 @@ public class ThriftHttpServlet extends TServlet {
    * returns the client name associated with the session. Else, it returns null.
    * @param request The HTTP Servlet Request send by the client
    * @return Client Username if the request has valid HS2 cookie, else returns null
-   * @throws UnsupportedEncodingException
    */
-  private String validateCookie(HttpServletRequest request) throws UnsupportedEncodingException {
+  private String validateCookie(HttpServletRequest request) {
     // Find all the valid cookies associated with the request.
     Cookie[] cookies = request.getCookies();
 
     if (cookies == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("No valid cookies associated with the request " + request);
-      }
+      LOG.debug("No valid cookies associated with the request {}", request);
       return null;
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Received cookies: " + toCookieStr(cookies));
+      LOG.debug("Received cookies: {}", toCookieStr(cookies));
     }
     return getClientNameFromCookie(cookies);
   }
@@ -320,12 +314,9 @@ public class ThriftHttpServlet extends TServlet {
    * Generate a server side cookie given the cookie value as the input.
    * @param str Input string token.
    * @return The generated cookie.
-   * @throws UnsupportedEncodingException
    */
-  private Cookie createCookie(String str) throws UnsupportedEncodingException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Cookie name = " + AUTH_COOKIE + " value = " + str);
-    }
+  private Cookie createCookie(String str) {
+    LOG.debug("Cookie name = {} value = {}", AUTH_COOKIE, str);
     Cookie cookie = new Cookie(AUTH_COOKIE, str);
 
     cookie.setMaxAge(cookieMaxAge);
@@ -511,18 +502,18 @@ public class ThriftHttpServlet extends TServlet {
 
   private String getUsername(HttpServletRequest request, String authType)
       throws HttpAuthenticationException {
-    String creds[] = getAuthHeaderTokens(request, authType);
+    String[] creds = getAuthHeaderTokens(request, authType);
     // Username must be present
     if (creds[0] == null || creds[0].isEmpty()) {
-      throw new HttpAuthenticationException("Authorization header received " +
-          "from the client does not contain username.");
+      throw new HttpAuthenticationException(
+          "Authorization header received from the client does not contain username.");
     }
     return creds[0];
   }
 
   private String getPassword(HttpServletRequest request, String authType)
       throws HttpAuthenticationException {
-    String creds[] = getAuthHeaderTokens(request, authType);
+    String[] creds = getAuthHeaderTokens(request, authType);
     // Password must be present
     if (creds[1] == null || creds[1].isEmpty()) {
       throw new HttpAuthenticationException("Authorization header received " +
@@ -536,15 +527,14 @@ public class ThriftHttpServlet extends TServlet {
     String authHeaderBase64 = getAuthHeader(request, authType);
     String authHeaderString = StringUtils.newStringUtf8(
         Base64.decodeBase64(authHeaderBase64.getBytes()));
-    String[] creds = authHeaderString.split(":");
-    return creds;
+    return authHeaderString.split(":");
   }
 
   /**
    * Returns the base64 encoded auth header payload
    * @param request
    * @param authType
-   * @return
+   * @return base64 encoded auth header payload
    * @throws HttpAuthenticationException
    */
   private String getAuthHeader(HttpServletRequest request, String authType)
@@ -566,7 +556,7 @@ public class ThriftHttpServlet extends TServlet {
     }
     authHeaderBase64String = authHeader.substring(beginIndex);
     // Authorization header must have a payload
-    if (authHeaderBase64String == null || authHeaderBase64String.isEmpty()) {
+    if (authHeaderBase64String.isEmpty()) {
       throw new HttpAuthenticationException("Authorization header received " +
           "from the client does not contain any data.");
     }
@@ -577,23 +567,16 @@ public class ThriftHttpServlet extends TServlet {
     return authType.equalsIgnoreCase(HiveAuthConstants.AuthTypes.KERBEROS.toString());
   }
 
-  private static String getDoAsQueryParam(String queryString) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("URL query string:" + queryString);
-    }
-    if (queryString == null) {
-      return null;
-    }
-    Map<String, String[]> params = javax.servlet.http.HttpUtils.parseQueryString( queryString );
-    Set<String> keySet = params.keySet();
-    for (String key: keySet) {
-      if (key.equalsIgnoreCase("doAs")) {
-        return params.get(key)[0];
+  private static String getDoAsQueryParam(Map<String, String[]> parameterMap) {
+    LOG.debug("URL query string: {}", parameterMap);
+
+    for(Map.Entry<String, String[]> entry : parameterMap.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase("doAs")) {
+        return entry.getValue()[0];
       }
     }
     return null;
   }
-
 }
 
 
